@@ -17,60 +17,42 @@ concurrency:
   group: bila-cvnss-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  bridge:
-    name: Python semantic bridge
+  lite:
+    name: Bila-LLVM Lite build, tests and size gate
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
           sparse-checkout: mlir/examples/cvnss
-      - run: python3 mlir/examples/cvnss/test/test_bridge.py
-  native:
-    name: Native MLIR build and CTest
-    runs-on: ubuntu-24.04
-    timeout-minutes: 360
-    steps:
-      - uses: actions/checkout@v4
+      - name: Build Lite without LLVM SDK
+        run: |
+          mkdir -p dist
+          g++ -std=c++17 -Os -flto -ffunction-sections -fdata-sections -Wl,--gc-sections -s -Wall -Wextra -Werror mlir/examples/cvnss/lite/main.cpp -o dist/bila-lite
+      - name: Test Base27 and IR emission
+        run: python3 mlir/examples/cvnss/lite/test_lite.py dist/bila-lite
+      - name: Test semantic bridge
+        run: python3 mlir/examples/cvnss/test/test_bridge.py
+      - name: Verify emitted LLVM IR with system Clang
+        run: |
+          dist/bila-lite emit-llvm 1 0 -1 > /tmp/bila.ll
+          clang -c /tmp/bila.ll -o /tmp/bila.o
+          printf 'extern int pack(void); int main(void) { return pack() == 21 ? 0 : 1; }\n' > /tmp/bila-test.c
+          clang /tmp/bila-test.c /tmp/bila.o -o /tmp/bila-test
+          /tmp/bila-test
+      - name: Package and enforce 30 MB budget
+        run: |
+          cp mlir/examples/cvnss/bridges/hub.py dist/
+          cp mlir/examples/cvnss/lite/README.md dist/
+          cp LICENSE.TXT dist/
+          python3 -c 'from pathlib import Path; n=sum(p.stat().st_size for p in Path("dist").rglob("*") if p.is_file()); print(f"Package: {n} bytes"); assert n < 30_000_000'
+          (cd dist && sha256sum bila-lite hub.py README.md LICENSE.TXT > SHA256SUMS)
+          tar -czf bila-llvm-lite-linux-x86_64.tar.gz -C dist .
+          test "$(stat -c%s bila-llvm-lite-linux-x86_64.tar.gz)" -lt 30000000
+      - uses: actions/upload-artifact@v4
         with:
-          persist-credentials: false
-          sparse-checkout: |
-            llvm
-            mlir
-            cmake
-            third-party
-            libc
-      - name: Install build tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build clang lld python3-venv
-          python3 -m venv "$RUNNER_TEMP/bila-venv"
-          "$RUNNER_TEMP/bila-venv/bin/pip" install cmake==3.31.10
-          echo "$RUNNER_TEMP/bila-venv/bin" >> "$GITHUB_PATH"
-      - name: Configure matching LLVM and MLIR
-        run: |
-          cmake -S llvm -B build-llvm -G Ninja \
-            -DLLVM_ENABLE_PROJECTS=mlir \
-            -DLLVM_TARGETS_TO_BUILD=Native \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DLLVM_ENABLE_ASSERTIONS=ON \
-            -DLLVM_ENABLE_TESTS=OFF \
-            -DMLIR_INCLUDE_TESTS=OFF \
-            -DLLVM_INCLUDE_EXAMPLES=OFF \
-            -DLLVM_INCLUDE_BENCHMARKS=OFF \
-            -DLLVM_ENABLE_LLD=ON \
-            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
-      - name: Build MLIR SDK
-        run: cmake --build build-llvm --target mlir-opt --parallel 2
-      - name: Configure CVNSS
-        run: |
-          cmake -S mlir/examples/cvnss -B build-cvnss -G Ninja \
-            -DMLIR_DIR="$PWD/build-llvm/lib/cmake/mlir" \
-            -DLLVM_DIR="$PWD/build-llvm/lib/cmake/llvm" \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
-      - name: Native build
-        run: cmake --build build-cvnss --target cvnss-opt --parallel 2
-      - name: CTest
-        run: ctest --test-dir build-cvnss --output-on-failure --no-tests=error
+          name: bila-llvm-lite-linux-x86_64
+          path: bila-llvm-lite-linux-x86_64.tar.gz
+          retention-days: 7
+          if-no-files-found: error

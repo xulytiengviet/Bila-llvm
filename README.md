@@ -59,3 +59,6 @@ chat](https://discord.gg/xS7Z362),
 
 The LLVM project has adopted a [code of conduct](https://llvm.org/docs/CodeOfConduct.html) for
 participants to all modes of communication within the project.
+
+## Bila-LLVM Lite
+Default CI builds the [standalone Lite profile](mlir/examples/cvnss/lite/README.md) with a strict 30 MB package gate. Native MLIR SDK builds are developer-only; no full LLVM build in default PR CI.

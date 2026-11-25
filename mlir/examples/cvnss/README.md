@@ -36,3 +36,6 @@ License: Apache-2.0 WITH LLVM-exception.
 
 ## Independent Bila-LLVM CI
 The Bila CVNSS CI workflow runs the portable Python bridge separately from the native build, using the matching LLVM/MLIR source revision. See [Actions](https://github.com/xulytiengviet/Bila-llvm/actions). A pending or skipped check is not a pass. Upstream LLVM acceptance is not required for local development.
+
+## Lite profile (0.3)
+Default CI now builds the standalone [Lite compiler](lite/README.md), without building LLVM. The native dialect remains a developer-only build using an existing matching MLIR SDK. Lite is a restricted constant Base27 IR emitter, not a replacement for native MLIR verification. CI artifacts are candidate packages, not stable releases.
