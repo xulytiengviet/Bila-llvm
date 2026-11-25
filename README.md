@@ -1,17 +1,108 @@
-# Bila-LLVM — CVNSS-CIR Research Toolchain
+# Bila-LLVM Lite — CVNSS-CIR Research Toolchain
 
-Independent research fork of LLVM/MLIR for CVNSS4.0 symbolic representation,
-balanced ternary computing and cross-language semantic interoperability.
+**Phiên bản thử nghiệm 0.3 / Experimental v0.3**
 
-[![Bila CVNSS CI](https://github.com/xulytiengviet/Bila-llvm/actions/workflows/bila-cvnss-ci.yml/badge.svg?branch=bila-cvnss-clean)](https://github.com/xulytiengviet/Bila-llvm/actions/workflows/bila-cvnss-ci.yml)
+Bila-LLVM là nhánh nghiên cứu độc lập dựa trên LLVM/MLIR, hướng tới biểu diễn ký hiệu tiếng Việt CVNSS4.0, Base27, tam phân cân bằng và khả năng tương tác ngữ nghĩa đa ngôn ngữ.
 
-- [CVNSS backend](mlir/examples/cvnss/README.md)
-- [Semantic bridges](mlir/examples/cvnss/bridges/README.md)
-- [Compatibility specification](mlir/examples/cvnss/specification/compatibility.md)
+[![Bila CVNSS CI](https://github.com/xulytiengviet/Bila-llvm/actions/workflows/bila-cvnss-ci.yml/badge.svg?branch=main)](https://github.com/xulytiengviet/Bila-llvm/actions/workflows/bila-cvnss-ci.yml)
 
-Experimental: native build and human review must be verified before release.
-The official CVNSS4.0 codec and native foreign-language conversion are not yet integrated.
-AI-assisted design, implementation and tests; no upstream endorsement implied.
+[CI / Downloads](https://github.com/xulytiengviet/Bila-llvm/actions/workflows/bila-cvnss-ci.yml) · [Lite source](mlir/examples/cvnss/lite/) · [Developer SDK](mlir/examples/cvnss/README.md) · [Compatibility](mlir/examples/cvnss/specification/compatibility.md)
+
+## 1. Cài đặt nhanh / Quick start
+
+Bản Lite không yêu cầu cài LLVM/MLIR SDK. Gói CI hiện dành cho Linux x86-64 (Ubuntu 24.04 runner); trên Windows 10 nên dùng WSL2 Ubuntu hoặc build từ mã nguồn bằng compiler C++17.
+
+### A. Tải bản đã biên dịch / Download
+
+1. Mở [Bila CVNSS CI](https://github.com/xulytiengviet/Bila-llvm/actions/workflows/bila-cvnss-ci.yml), chọn lần chạy thành công mới nhất trên main (hoặc [lần chạy PR đã kiểm chứng](https://github.com/xulytiengviet/Bila-llvm/actions/runs/45577729669)).
+2. Trong Artifacts tải `bila-llvm-lite-linux-x86_64`. Đăng nhập GitHub nếu cần. Artifact chỉ lưu 7 ngày, không phải GitHub Release lâu dài.
+3. Giải nén ZIP rồi giải nén tar.gz:
+
+```bash
+mkdir -p bila-lite-dist
+tar -xzf bila-llvm-lite-linux-x86_64.tar.gz -C bila-lite-dist
+cd bila-lite-dist
+sha256sum -c SHA256SUMS
+chmod +x bila-lite
+./bila-lite --version
+```
+
+### B. Build từ mã nguồn / Build from source
+
+Ubuntu/WSL:
+
+```bash
+sudo apt update
+sudo apt install -y git g++ python3
+git clone --depth 1 --filter=blob:none --sparse https://github.com/xulytiengviet/Bila-llvm.git
+cd Bila-llvm
+git sparse-checkout set mlir/examples/cvnss
+mkdir -p dist
+g++ -std=c++17 -Os -flto -ffunction-sections -fdata-sections -Wl,--gc-sections -s mlir/examples/cvnss/lite/main.cpp -o dist/bila-lite
+python3 mlir/examples/cvnss/lite/test_lite.py dist/bila-lite
+python3 mlir/examples/cvnss/test/test_bridge.py
+```
+
+## 2. Sử dụng / Usage
+
+```bash
+./bila-lite --help
+./bila-lite pack 1 0 -1
+# 21
+./bila-lite unpack 21
+# 1 0 -1
+./bila-lite emit-mlir 1 0 -1 > sample.mlir
+./bila-lite emit-llvm 1 0 -1 > sample.ll
+```
+
+Nếu sử dụng bản tự build từ mã nguồn, thay `./bila-lite` bằng `./dist/bila-lite`.
+
+Công thức: ID = 13 + 9h + 3m + l, mỗi trit thuộc {-1, 0, +1}; ID thuộc [0, 26]. Dữ liệu không hợp lệ bị từ chối.
+
+Muốn biên dịch LLVM IR thành object file (tùy chọn, cần Clang):
+
+```bash
+clang -c sample.ll -o sample.o
+```
+
+## 3. Cầu ngữ nghĩa / Semantic bridge
+
+Python 3 chỉ cần cho tiện ích hub.py. Ví dụ từ thư mục mã nguồn:
+
+```bash
+printf 'def process(x):\n    return x * 2\n' > example.py
+python3 mlir/examples/cvnss/bridges/hub.py python example.py --format mlir > example.mlir
+```
+
+Đối với C/C++, JavaScript, Rust, BilaScript, dùng manifest symbol JSON rõ ràng, ví dụ `[{"symbol":"process","kind":"function"}]` lưu vào symbols.json:
+
+```bash
+python3 mlir/examples/cvnss/bridges/hub.py cpp example.cpp --symbols symbols.json --format json
+```
+
+Bridge không thực thi chương trình nhập, không tự suy luận tương đương ngữ nghĩa và chưa tích hợp native ClangIR, JSIR, MIR hay xDSL.
+
+## 4. Kết quả kiểm thử / Validation
+
+[CI run 45577729669](https://github.com/xulytiengviet/Bila-llvm/actions/runs/45577729669) trên commit `00376ca`: Lite build PASS, 27 Base27 round trips, 54 IR outputs, 4 Python bridge tests, mẫu LLVM IR thực thi thành công qua Clang; package trước manifest 33,997 bytes, artifact ZIP 11,059 bytes. Ngưỡng CI: dưới 30,000,000 bytes.
+
+Đây là số đo của bản Lite thử nghiệm trên Linux, không phải dung lượng toàn bộ LLVM SDK. CI main cần được kiểm tra riêng. Native MLIR build/CTest chưa được xác nhận; GitHub Pages build có lỗi Jekyll riêng, không phải lỗi Lite.
+
+## 5. Kiến trúc / Architecture
+
+| Profile | Scope |
+| --- | --- |
+| Lite | Standalone constant Base27 compiler / IR emitter, C++17 |
+| Developer | Native MLIR dialect, ODS, verification, lowering; matching SDK required |
+| Future | Official CVNSS4.0 codec, BilaScript AST, domain dialects, cross-language native bridges |
+
+Lite chỉ sinh tập con IR hằng số; không phải compiler BilaScript đầy đủ, general MLIR optimizer hay codec CVNSS4.0 chính thức. Không tuyên bố tương đương ngữ nghĩa hoặc hiệu năng AI khi chưa có benchmark.
+
+[Developer build instructions](mlir/examples/cvnss/README.md) · [Bridge specification](mlir/examples/cvnss/bridges/README.md) · [Quality gates](mlir/examples/cvnss/specification/quality-gates.md)
+
+## 6. Đóng góp / Contributions
+
+Báo lỗi và đề xuất tại [Issues](https://github.com/xulytiengviet/Bila-llvm/issues). Mã nguồn nghiên cứu có AI hỗ trợ đáng kể; cần human review trước phát hành ổn định. Đây là dự án độc lập, không hàm ý LLVM upstream chấp thuận. Giấy phép: [Apache-2.0 WITH LLVM-exception](LICENSE.TXT).
 
 ---
 
@@ -59,6 +150,3 @@ chat](https://discord.gg/xS7Z362),
 
 The LLVM project has adopted a [code of conduct](https://llvm.org/docs/CodeOfConduct.html) for
 participants to all modes of communication within the project.
-
-## Bila-LLVM Lite
-Default CI builds the [standalone Lite profile](mlir/examples/cvnss/lite/README.md) with a strict 30 MB package gate. Native MLIR SDK builds are developer-only; no full LLVM build in default PR CI.
