@@ -1,0 +1,75 @@
+name: Bila CVNSS CI
+on:
+  push:
+    branches: [bila-ci, main]
+    paths:
+      - 'mlir/examples/cvnss/**'
+      - '.github/workflows/bila-cvnss-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'mlir/examples/cvnss/**'
+      - '.github/workflows/bila-cvnss-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: bila-cvnss-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  bridge:
+    name: Python semantic bridge
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: mlir/examples/cvnss
+      - run: python3 mlir/examples/cvnss/test/test_bridge.py
+  native:
+    name: Native MLIR build and CTest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            llvm
+            mlir
+            cmake
+            third-party
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build clang lld python3-venv
+          python3 -m venv "$RUNNER_TEMP/bila-venv"
+          "$RUNNER_TEMP/bila-venv/bin/pip" install cmake==3.31.10
+          echo "$RUNNER_TEMP/bila-venv/bin" >> "$GITHUB_PATH"
+      - name: Configure matching LLVM and MLIR
+        run: |
+          cmake -S llvm -B build-llvm -G Ninja \
+            -DLLVM_ENABLE_PROJECTS=mlir \
+            -DLLVM_TARGETS_TO_BUILD=Native \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DLLVM_ENABLE_ASSERTIONS=ON \
+            -DLLVM_ENABLE_TESTS=OFF \
+            -DMLIR_INCLUDE_TESTS=OFF \
+            -DLLVM_INCLUDE_EXAMPLES=OFF \
+            -DLLVM_INCLUDE_BENCHMARKS=OFF \
+            -DLLVM_ENABLE_LLD=ON \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+      - name: Build MLIR SDK
+        run: cmake --build build-llvm --target mlir-opt --parallel 2
+      - name: Configure CVNSS
+        run: |
+          cmake -S mlir/examples/cvnss -B build-cvnss -G Ninja \
+            -DMLIR_DIR="$PWD/build-llvm/lib/cmake/mlir" \
+            -DLLVM_DIR="$PWD/build-llvm/lib/cmake/llvm" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+      - name: Native build
+        run: cmake --build build-cvnss --target cvnss-opt --parallel 2
+      - name: CTest
+        run: ctest --test-dir build-cvnss --output-on-failure --no-tests=error

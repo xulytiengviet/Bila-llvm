@@ -1,4 +1,4 @@
-# CVNSS-CIR MLIR backend (experimental v0.1)
+# CVNSS-CIR MLIR backend (experimental v0.2)
 
 Out-of-tree C++ backend based on the repository's MLIR standalone example.
 BilaScript is the intended frontend; the current input contract is textual MLIR.
@@ -11,7 +11,7 @@ Use CMake >= 3.31, Ninja, C++17 and Python 3.
 cmake -S mlir/examples/cvnss -B build-cvnss -G Ninja -DMLIR_DIR=/path/to/lib/cmake/mlir -DLLVM_DIR=/path/to/lib/cmake/llvm
 cmake --build build-cvnss --target cvnss-opt
 ctest --test-dir build-cvnss --output-on-failure
-build-cvnss/cvnss-opt mlir/examples/cvnss/test/demo.mlir --cvnss-lower-trit
+build-cvnss/bin/cvnss-opt mlir/examples/cvnss/test/demo.mlir --cvnss-lower-trit
 ```
 The tool registers the standard MLIR dialects and passes. For LLVM lowering of
 the pack function, use standard arith/func conversion passes and reconcile
@@ -33,3 +33,6 @@ export pass before executable lowering.
 5. Dynamic trit ops, target-specific lowering, benchmarking and ViPickers explorer.
 
 License: Apache-2.0 WITH LLVM-exception.
+
+## Independent Bila-LLVM CI
+The Bila CVNSS CI workflow runs the portable Python bridge separately from the native build, using the matching LLVM/MLIR source revision. See [Actions](https://github.com/xulytiengviet/Bila-llvm/actions). A pending or skipped check is not a pass. Upstream LLVM acceptance is not required for local development.
