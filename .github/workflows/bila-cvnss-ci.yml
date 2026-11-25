@@ -1,0 +1,58 @@
+name: Bila CVNSS CI
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mlir/examples/cvnss/**'
+      - '.github/workflows/bila-cvnss-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'mlir/examples/cvnss/**'
+      - '.github/workflows/bila-cvnss-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: bila-cvnss-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  lite:
+    name: Bila-LLVM Lite build, tests and size gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: mlir/examples/cvnss
+      - name: Build Lite without LLVM SDK
+        run: |
+          mkdir -p dist
+          g++ -std=c++17 -Os -flto -ffunction-sections -fdata-sections -Wl,--gc-sections -s -Wall -Wextra -Werror mlir/examples/cvnss/lite/main.cpp -o dist/bila-lite
+      - name: Test Base27 and IR emission
+        run: python3 mlir/examples/cvnss/lite/test_lite.py dist/bila-lite
+      - name: Test semantic bridge
+        run: python3 mlir/examples/cvnss/test/test_bridge.py
+      - name: Verify emitted LLVM IR with system Clang
+        run: |
+          dist/bila-lite emit-llvm 1 0 -1 > /tmp/bila.ll
+          clang -c /tmp/bila.ll -o /tmp/bila.o
+          printf 'extern int pack(void); int main(void) { return pack() == 21 ? 0 : 1; }\n' > /tmp/bila-test.c
+          clang /tmp/bila-test.c /tmp/bila.o -o /tmp/bila-test
+          /tmp/bila-test
+      - name: Package and enforce 30 MB budget
+        run: |
+          cp mlir/examples/cvnss/bridges/hub.py dist/
+          cp mlir/examples/cvnss/lite/README.md dist/
+          cp LICENSE.TXT dist/
+          python3 -c 'from pathlib import Path; n=sum(p.stat().st_size for p in Path("dist").rglob("*") if p.is_file()); print(f"Package: {n} bytes"); assert n < 30_000_000'
+          (cd dist && sha256sum bila-lite hub.py README.md LICENSE.TXT > SHA256SUMS)
+          tar -czf bila-llvm-lite-linux-x86_64.tar.gz -C dist .
+          test "$(stat -c%s bila-llvm-lite-linux-x86_64.tar.gz)" -lt 30000000
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bila-llvm-lite-linux-x86_64
+          path: bila-llvm-lite-linux-x86_64.tar.gz
+          retention-days: 7
+          if-no-files-found: error

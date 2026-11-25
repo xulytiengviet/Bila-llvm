@@ -1,3 +1,20 @@
+# Bila-LLVM — CVNSS-CIR Research Toolchain
+
+Independent research fork of LLVM/MLIR for CVNSS4.0 symbolic representation,
+balanced ternary computing and cross-language semantic interoperability.
+
+[![Bila CVNSS CI](https://github.com/xulytiengviet/Bila-llvm/actions/workflows/bila-cvnss-ci.yml/badge.svg?branch=bila-cvnss-clean)](https://github.com/xulytiengviet/Bila-llvm/actions/workflows/bila-cvnss-ci.yml)
+
+- [CVNSS backend](mlir/examples/cvnss/README.md)
+- [Semantic bridges](mlir/examples/cvnss/bridges/README.md)
+- [Compatibility specification](mlir/examples/cvnss/specification/compatibility.md)
+
+Experimental: native build and human review must be verified before release.
+The official CVNSS4.0 codec and native foreign-language conversion are not yet integrated.
+AI-assisted design, implementation and tests; no upstream endorsement implied.
+
+---
+
 # The LLVM Compiler Infrastructure
 
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/llvm/llvm-project/badge)](https://securityscorecards.dev/viewer/?uri=github.com/llvm/llvm-project)
@@ -42,3 +59,6 @@ chat](https://discord.gg/xS7Z362),
 
 The LLVM project has adopted a [code of conduct](https://llvm.org/docs/CodeOfConduct.html) for
 participants to all modes of communication within the project.
+
+## Bila-LLVM Lite
+Default CI builds the [standalone Lite profile](mlir/examples/cvnss/lite/README.md) with a strict 30 MB package gate. Native MLIR SDK builds are developer-only; no full LLVM build in default PR CI.
