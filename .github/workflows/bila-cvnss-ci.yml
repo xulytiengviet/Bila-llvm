@@ -1,7 +1,7 @@
 name: Bila CVNSS CI
 on:
   push:
-    branches: [bila-ci, bila-cvnss-clean, main]
+    branches: [main]
     paths:
       - 'mlir/examples/cvnss/**'
       - '.github/workflows/bila-cvnss-ci.yml'
@@ -40,6 +40,7 @@ jobs:
             mlir
             cmake
             third-party
+            libc
       - name: Install build tools
         run: |
           sudo apt-get update
